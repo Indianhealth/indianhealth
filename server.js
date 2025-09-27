@@ -131,14 +131,14 @@ app.get('/admin/login', (req, res) => {
 // --- Admin Login Route (JSON) ---
 app.post('/admin/login', (req, res) => {
   const { username, password } = req.body;
-
   if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASS) {
     req.session.isAdmin = true;
-    return res.json({ success: true, message: 'Login successful' });
+    // JSON response instead of redirect
+    return res.json({ success: true, message: "Logged in successfully" });
   }
-
-  return res.status(401).json({ success: false, message: 'Invalid username/password' });
+  res.status(401).json({ success: false, message: "Invalid credentials" });
 });
+
 
 // --- Admin Logout ---
 app.get('/admin/logout', (req, res) => {
@@ -177,3 +177,4 @@ app.use((err, req, res, next) => {
 // --- Start Server ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
