@@ -16,7 +16,7 @@ form.addEventListener("submit", async (e) => {
     const data = await res.json();
 
     if (data.success) {
-      window.location.href = "/admin/dashboard"; // redirect after successful login
+      window.location.href = "/admin"; // redirect after successful login
     } else {
       alert("Login failed: " + (data.message || "Invalid credentials"));
     }
@@ -25,3 +25,4 @@ form.addEventListener("submit", async (e) => {
     alert("Something went wrong!");
   }
 });
+
