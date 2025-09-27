@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard - Registrations</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="topbar">
+    <h1>Admin Dashboard</h1>
+    <a href="/admin/logout">Logout</a>
+  </div>
+
+  <table id="regTable">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Phone</th>
+        <th>Email</th>
+        <th>City</th>
+        <th>Address</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="pagination">
+    <button id="prevBtn">Prev</button>
+    <span id="pageInfo"></span>
+    <button id="nextBtn">Next</button>
+  </div>
+
+  <button id="downloadCsv">Download CSV</button>
+
+  <!-- External JS -->
+  <script src="/js/admin.js"></script>
+</body>
+</html>
