@@ -1,4 +1,3 @@
-// server.js
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
@@ -56,13 +55,13 @@ app.use(session({
   store: MongoStore.create({ mongoUrl: MONGO_URI }),
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // HTTPS only
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     maxAge: 60 * 60 * 1000 // 1 hour
   }
 }));
 
-// --- CORS (Production) ---
+// --- CORS ---
 if (process.env.NODE_ENV === 'production') {
   app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 } else {
@@ -92,7 +91,7 @@ function validateRegistration(data) {
   return errors;
 }
 
-// --- API Routes ---
+// --- Public API for registrations ---
 app.post('/api/register', async (req, res) => {
   try {
     const { name, phone, email, city = '', address = '' } = req.body;
@@ -121,7 +120,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 // --- Admin Middleware ---
 function requireLogin(req, res, next) {
   if (req.session && req.session.isAdmin) return next();
-  return res.redirect('/admin/login');
+  return res.status(401).json({ success: false, message: 'Not logged in' });
 }
 
 // --- Admin Pages ---
@@ -129,24 +128,29 @@ app.get('/admin/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
+// --- Admin Login Route (JSON) ---
 app.post('/admin/login', (req, res) => {
   const { username, password } = req.body;
+
   if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASS) {
     req.session.isAdmin = true;
-    return res.redirect('/admin');
+    return res.json({ success: true, message: 'Login successful' });
   }
-  res.status(401).send('<p>Invalid credentials. <a href="/admin/login">Try again</a></p>');
+
+  return res.status(401).json({ success: false, message: 'Invalid username/password' });
 });
 
+// --- Admin Logout ---
 app.get('/admin/logout', (req, res) => {
-  req.session.destroy(() => res.redirect('/admin/login'));
+  req.session.destroy(() => res.json({ success: true, message: 'Logged out' }));
 });
 
+// --- Admin Dashboard ---
 app.get('/admin', requireLogin, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// --- Admin API ---
+// --- Admin Registrations API ---
 app.get('/admin/registrations', requireLogin, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -158,16 +162,16 @@ app.get('/admin/registrations', requireLogin, async (req, res) => {
       Registration.countDocuments()
     ]);
 
-    res.json({ data, total, page, pages: Math.ceil(total / limit) });
+    res.json({ success: true, data, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // --- Global Error Handler ---
 app.use((err, req, res, next) => {
   console.error('Global error:', err);
-  res.status(500).json({ message: 'Internal Server Error' });
+  res.status(500).json({ success: false, message: 'Internal Server Error' });
 });
 
 // --- Start Server ---
