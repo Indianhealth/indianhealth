@@ -10,13 +10,14 @@ form.addEventListener("submit", async (e) => {
     const res = await fetch("/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include", // ✅ important for session cookie
       body: JSON.stringify({ username, password })
     });
 
     const data = await res.json();
 
     if (data.success) {
-      window.location.href = "/admin"; // redirect after successful login
+      window.location.href = "/admin"; // correct dashboard route
     } else {
       alert("Login failed: " + (data.message || "Invalid credentials"));
     }
@@ -25,4 +26,3 @@ form.addEventListener("submit", async (e) => {
     alert("Something went wrong!");
   }
 });
-
