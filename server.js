@@ -11,14 +11,7 @@ const MongoStore = require('connect-mongo');
 
 const app = express();
 
-// --- CORS ---
-app.use(cors({
-  origin: process.env.FRONTEND_URL, // FRONTEND_URL from env
-  methods: ["GET", "POST"],
-  credentials: true
-}));
-
-// --- Helmet CSP ---
+// --- Security Middlewares ---
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -26,42 +19,69 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", 'https:'],
       imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", process.env.FRONTEND_URL], // allow frontend API requests
+      connectSrc: ["'self'"],
     }
   }
 }));
 
+app.use(helmet({ contentSecurityPolicy: false }));
+
+
 // --- Rate Limiter ---
-app.use(rateLimit({
-  windowMs: 1*60*1000,
+const limiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
   max: 60,
-  message: { message: 'Too many requests, try again later.' }
-}));
+  message: { message: 'Too many requests, please try again later.' }
+});
+app.use(limiter);
 
 // --- Body Parsers ---
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// --- MongoDB ---
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => { console.error('MongoDB connection error:', err.message); process.exit(1); });
+// --- MongoDB Setup ---
+const MONGO_URI = process.env.MONGO_URI;
+mongoose.connect(MONGO_URI,).then(() => console.log('MongoDB connected'))
+  .catch(err => {
+    console.error('MongoDB connection error:', err.message);
+    process.exit(1);
+  });
 
-// --- Session ---
+// --- Session Setup ---
 app.use(session({
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || 'supersecretkey',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+  store: MongoStore.create({ mongoUrl: MONGO_URI }),
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 60*60*1000
+    maxAge: 60 * 60 * 1000 // 1 hour
   }
 }));
 
-// --- Static files ---
+// --- CORS ---
+const allowedOrigins = [
+  "http://10.177.155.166:3000",
+  "https://ihcwf.org"
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true); // Postman / local file testing
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true
+}));
+
+
+
+// --- Serve Static Files ---
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Registration Schema ---
@@ -75,7 +95,7 @@ const registrationSchema = new mongoose.Schema({
 });
 const Registration = mongoose.model('Registration', registrationSchema);
 
-// --- Validation ---
+// --- Helper Validation ---
 function validateRegistration(data) {
   const errors = [];
   if (!data.name || data.name.length < 2) errors.push('Invalid name');
@@ -84,10 +104,10 @@ function validateRegistration(data) {
   return errors;
 }
 
-// --- API: Register ---
+// --- Public API for registrations ---
 app.post('/api/register', async (req, res) => {
   try {
-    const { name, phone, email, city='', address='' } = req.body;
+    const { name, phone, email, city = '', address = '' } = req.body;
     const errors = validateRegistration({ name, phone, email });
     if (errors.length) return res.status(400).json({ message: errors.join(', ') });
 
@@ -100,17 +120,19 @@ app.post('/api/register', async (req, res) => {
 
     const doc = new Registration({ name, phone, email, city, address });
     await doc.save();
-    return res.status(201).json({ success: true, message: 'Registration saved' });
+    return res.status(201).json({ message: 'Registration saved' });
   } catch (err) {
     console.error('Register error:', err);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    return res.status(500).json({ message: 'Server error' });
   }
 });
 
 // --- Healthcheck ---
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// --- Admin ---
+
+
+// --- Admin Dashboard ---
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
@@ -120,14 +142,14 @@ app.get('/admin/registrations', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const skip = (page-1)*limit;
+    const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
       Registration.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
       Registration.countDocuments()
     ]);
 
-    res.json({ success: true, data, total, page, pages: Math.ceil(total/limit) });
+    res.json({ success: true, data, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
